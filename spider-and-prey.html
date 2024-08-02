@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spider on Web</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        .custom-cursor {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: url('fly.png');
+            background-size: contain;
+            pointer-events: none;
+            z-index: 999;
+            transition: transform 0.5s;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+        .content {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: green;
+            padding: 20px;
+            z-index: 1001;
+        }
+        .content ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .content li {
+            padding: 10% 0;
+        }
+        .image-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+        .image-container img {
+            max-width: 80vw;
+            max-height: 80vh;
+        }
+    </style>
+</head>
+<body>
+    <!-- <div class='custom-cursor' id='customCursor'></div> -->
+    <canvas id="webCanvas"></canvas>
+    <div class="content">
+        <h1>Interesting facts about spiders</h1>
+        <ul id="factsList">
+            <!-- Facts will be injected by JavaScript -->
+        </ul>
+    </div>
+    <div class="image-container" id="imageContainer">
+        <img id="factImage" src="" alt="Spider Fact Image">
+    </div>
+    <script>
+        //const customCursor = document.getElementById('customCursor');
+        const canvas = document.getElementById('webCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let spiderX = canvas.width - 100;
+        let spiderY = 50;
+        const spiderSize = 20;
+        const spiderSpeed = 2;
+        const webCenterX = canvas.width / 2;
+        const webCenterY = canvas.height / 2;
+        const webRadius = Math.max(canvas.width, canvas.height) / 2 - 20;
+        let animationFrameId;
+        let vibrationCounter = 0;
+        let heliceraeMove = 0;
+        let heliceraeVisible = false;
+        let targetX = spiderX;
+        let targetY = spiderY;
+        let legsMove = false;
+        let frameCounter = 0;
+        let prevMouseMoveX = 0;
+        let prevMouseMoveY = 0;
+        const flyImage = new Image();
+        let mousemoveCounter = 0;
+
+        flyImage.src = 'fly.png';
+
+        function drawWeb(vibration, heliceraeVisible) {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = 1;
+
+            // Draw radial lines
+            for (let angle = 0; angle < 360; angle += 15) {
+                const radian = angle * Math.PI / 180;
+                let amplitude = 0;
+                if(!heliceraeVisible) {
+                    amplitude = vibration * Math.sin(vibrationCounter * 0.1 + angle);
+                }
+                const x = webCenterX + (webRadius + amplitude) * Math.cos(radian);
+                const y = webCenterY + (webRadius + amplitude) * Math.sin(radian);
+                ctx.beginPath();
+                ctx.moveTo(webCenterX, webCenterY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            }
+
+            // Draw concentric circles
+            for (let r = 0; r <= webRadius; r += 30) {
+                ctx.beginPath();
+                let concentricAmplitude = 0;
+                if(!heliceraeVisible) {
+                    concentricAmplitude = vibration * Math.sin(vibrationCounter * 0.1 + r);
+                }
+                const radius = r + concentricAmplitude;
+                ctx.arc(webCenterX, webCenterY, Math.abs(radius), 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+        }
+
+        const hairData = [];
+        for (let i = 0; i < 100; i++) {
+            hairData.push({
+                angleOfHair: Math.random() * Math.PI * 2,
+                lengthOfHair: Math.random() * 5 + 1,
+                pointOnBody: Math.random() * spiderSize - 1
+            });
+        }
+
+        function drawSpider(x, y, angle, legsMove, heliceraeVisible) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            // Draw body
+            ctx.beginPath();
+            ctx.arc(0, 0, spiderSize, 0, Math.PI * 2);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+            
+            // Draw head
+            ctx.beginPath();
+            ctx.arc(0, - 20, 10, 0, Math.PI * 2);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+
+            // Draw helicerae
+            if(heliceraeVisible) {
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-5, -20);
+                ctx.lineTo(-5, -25 - heliceraeMove);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(5, -20);
+                ctx.lineTo(5, -25 -heliceraeMove);
+                ctx.stroke();
+            }
+
+            // Draw gray hairs
+            ctx.strokeStyle = 'gray';
+            ctx.lineWidth = 1;
+            hairData.forEach(data => {
+                let xPos = Math.cos(data.angleOfHair) * data.pointOnBody; // Start point on the spider's body
+                let yPos = Math.sin(data.angleOfHair) * data.pointOnBody; 
+                let xEnd = xPos + Math.cos(data.angleOfHair) * data.lengthOfHair; // End point of the hair
+                let yEnd = yPos + Math.sin(data.angleOfHair) * data.lengthOfHair;
+
+                ctx.beginPath();
+                ctx.moveTo(xPos, yPos);
+                ctx.lineTo(xEnd, yEnd);
+                ctx.stroke();
+            });
+            
+            for (let i = 1; i < 5; i++) {
+                // Draw legs
+                ctx.strokeStyle = 'black';
+                ctx.lineCap = 'round';
+                ctx.lineWidth = i % 2 === 0 ? 5 : 3;
+                ctx.beginPath();
+                ctx.moveTo(0, 0); // Start at the body
+                ctx.lineTo(- 30, -i * 20); // Move out to leg end
+                if(i === 4) {
+                    ctx.lineTo(- 35, -i * 25);
+                } else {
+                    ctx.lineTo(-25, legsMove ? -i * 1 : -i * 5);
+                }
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 0); // Start at the body
+                ctx.lineTo(30, -i * 20); // Move out to leg end
+                if(i === 4) {
+                    ctx.lineTo(35, -i * 25);
+                } else {
+                    ctx.lineTo(25, legsMove ? -i * 1 : -i * 5);
+                }
+                ctx.stroke();
+
+                // Draw eyes
+                ctx.beginPath();
+                ctx.arc(- 5, - i * (i === 1 ? 20 : 4), 2, 0, Math.PI * 2);
+                ctx.fillStyle = i === 1 ? 'red' : 'white';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(5, - i * (i === 1 ? 20 : 4), 2, 0, Math.PI * 2);
+                ctx.fillStyle = i === 1 ? 'red' : 'white';
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        
+        function drawFly(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            // Draw fly image
+            ctx.drawImage(flyImage, - flyImage.width / 2, - flyImage.height / 2);
+
+            ctx.restore();
+        }
+
+        function animate() {
+            const dx = targetX - spiderX;
+            const dy = targetY - spiderY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(targetY, targetX);
+            //console.log(angle);
+            const vibration = 5;
+            
+            vibrationCounter++;
+            if(heliceraeVisible) {
+                heliceraeMove = Math.sin(vibrationCounter * 0.1) * 5; // animate helicerae
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawWeb(vibration, heliceraeVisible);
+            drawSpider(spiderX, spiderY, angle, legsMove, heliceraeVisible);
+            drawFly(targetX, targetY, angle);
+
+            if (distance > spiderSpeed) {
+                spiderX += (dx / distance) * spiderSpeed;
+                spiderY += (dy / distance) * spiderSpeed;
+                heliceraeVisible = false;
+
+                frameCounter++;
+                //console.log(frameCounter);
+                if(frameCounter % 15 === 0) {
+                    legsMove = !legsMove;
+                } 
+            } else {
+                heliceraeVisible = true;
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            mousemoveCounter++;
+            console.log(mousemoveCounter);
+            targetX = e.clientX;
+            targetY = e.clientY;
+            const currMouseMoveX = e.clientX;
+            const currMouseMoveY = e.clientY;
+
+            prevMouseMoveX = currMouseMoveX;
+            prevMouseMoveY = currMouseMoveY;
+
+            if(!animationFrameId) {
+                animate();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawWeb(0);
+        });
+
+        const facts = [
+            { text: 'Spiders are not insects', img: 'https://res.cloudinary.com/dckio9wiu/image/upload/v1678210203/users-chat-app/rchehhc0z7gcbih1oszi.jpg' },
+            { text: 'Most spiders have eight eyes', img: 'https://via.placeholder.com/800x600' },
+            { text: 'Spiders are found on every continent except Antarctica', img: 'https://via.placeholder.com/800x600' }
+        ];
+
+        const factsList = document.getElementById('factsList');
+        const imageContainer = document.getElementById('imageContainer');
+        const factImage = document.getElementById('factImage');
+
+        facts.forEach((fact, index) => {
+            const li = document.createElement('li');
+            li.textContent = fact.text;
+            li.addEventListener('click', () => {
+                factImage.src = fact.img;
+                imageContainer.style.display = 'block';
+            });
+            factsList.appendChild(li);
+        });
+
+        imageContainer.addEventListener('click', () => {
+            imageContainer.style.display = 'none';
+        });
+
+        window.onload = () => {
+            drawWeb();
+        };
+    </script>
+</body>
+</html>
